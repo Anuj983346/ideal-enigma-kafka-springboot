@@ -18,17 +18,3 @@ This is a minimal Java + Spring Boot project using **Gradle Kotlin DSL** (`build
    ```bash
    cmd.exe /c "C:\kafka\bin\windows\kafka-topics.bat --create --topic orders --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1"
    ```
-
-3. Build & run:
-   ```bash
-   gradle bootRun
-   ```
-
-4. Test endpoint:
-   ```bash
-   curl -X POST http://localhost:8080/api/orders -H "Content-Type: application/json" -d '{"userId":"user123","amount":149.99}'
-   ```
-
-## Notes
-- `build.gradle.kts` uses Spring Boot 3.3.2 plugin. Adjust versions as needed.
-- This project uses Java source files and Gradle Kotlin DSL build script.
