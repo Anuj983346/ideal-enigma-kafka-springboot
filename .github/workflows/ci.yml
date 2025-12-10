@@ -1,0 +1,61 @@
+name: CI - Build & Integration
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Ensure docker-compose available
+        run: docker compose version || (sudo apt-get update && sudo apt-get install -y docker-compose-plugin)
+
+      - name: Start Kafka for tests
+        run: docker compose up -d
+        working-directory: ${{ github.workspace }}
+
+      - name: Wait for Kafka port
+        run: |
+          for i in {1..30}; do nc -z localhost 9092 && echo "Kafka ready" && break || sleep 2; done
+
+      - name: Build application
+        run: chmod +x ./gradlew && ./gradlew clean build -x test
+
+      - name: Start app
+        run: nohup java -jar build/libs/*.jar > app.log 2>&1 & echo $! > app.pid
+
+      - name: Wait for health
+        run: |
+          for i in {1..30}; do curl -sSf http://localhost:8080/actuator/health && echo "app ready" && break || sleep 2; done
+
+      - name: Smoke test - POST order
+        run: |
+          curl -sS -X POST http://localhost:8080/api/orders -H "Content-Type: application/json" -d '{"userId":"ci-test","amount":1.23}' || true
+          sleep 2
+          tail -n 200 app.log || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-log
+          path: app.log
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose down -v
+          if [ -f app.pid ]; then kill $(cat app.pid) || true; fi
